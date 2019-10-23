@@ -4,37 +4,11 @@ from ctypes import *
 import time
 import RPi.GPIO as GPIO
 
-hspi = CDLL('./dev_hardware_SPI.so')
-
-
-disp1 = [
-    [0b11111111,0x81,0xBD,0xA5,0xA5,0xBD,0x81,0xFF],
-    [0x00,0x7E,0x42,0x5A,0x5A,0x42,0x7E,0x00]]
-
-bit_matrix = [
-    [1,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,0,1],
-    [1,0,1,1,1,1,0,1],
-    [1,0,1,1,1,1,0,1],
-    [1,0,1,1,1,1,0,1],
-    [1,0,1,1,1,1,0,1],
-    [1,0,1,1,1,1,0,1],
-    [1,0,1,1,1,1,0,1],
-    [1,0,1,1,1,1,0,1],
-    [1,0,1,1,1,1,0,1],
-    [1,0,1,1,1,1,0,1],
-    [1,0,1,1,1,1,0,1],
-    [1,0,1,1,1,1,0,1],
-    [1,0,1,1,1,1,0,1],
-    [1,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1]
-    ]
-    
-hspi.DEV_HARDWARE_SPI_begin("/dev/spidev0.0")
-hspi.DEV_HARDWARE_SPI_ChipSelect(3)
-
 class MAX7219:
     def __init__(self):
+        self.hspi = CDLL('./dev_hardware_SPI.so')
+        self.hspi.DEV_HARDWARE_SPI_begin("/dev/spidev0.0")
+        self.hspi.DEV_HARDWARE_SPI_ChipSelect(3)
         self.cs_pin = 8
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
@@ -42,7 +16,7 @@ class MAX7219:
         
     def WriteByte(self, Reg):
         GPIO.output(self.cs_pin, 0)
-        hspi.DEV_SPI_WriteByte(Reg)
+        self.hspi.DEV_SPI_WriteByte(Reg)
         
     def Write(self, address1, dat1, address2, dat2):
         GPIO.output(self.cs_pin, 0)
