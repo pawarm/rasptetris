@@ -1,23 +1,19 @@
-from config import colors, tetris_shapes
+from config import tetris_shapes, bit_matrix
 from utils import *
 from random import randrange as rand
-import pygame
+from MAX7219 import MAX7219
 import sys
-
+import copy
+import keyboard
+import time
+from threading import Timer
 
 class Tetris(object):
     def __init__(self):
-        pygame.init()
-        pygame.key.set_repeat(250, 25)
-        self.width = config['cell_size'] * config['cols']
-        self.height = config['cell_size'] * config['rows']
-
-        self.screen = pygame.display.set_mode((self.width, self.height))
-        pygame.event.set_blocked(pygame.MOUSEMOTION)  # We do not need
-        # mouse movement
-        # events, so we
-        # block them.
+        self.led = MAX7219()
+        self.led.Init()
         self.init_game()
+        self.timeframe = Timer(0.75, self.next_frame)
 
     def new_stone(self):
         self.stone = tetris_shapes[rand(len(tetris_shapes))]
@@ -33,35 +29,9 @@ class Tetris(object):
         self.board = new_board()
         self.new_stone()
 
-    def center_msg(self, msg):
-        for i, line in enumerate(msg.splitlines()):
-            msg_image = pygame.font.Font(
-                pygame.font.get_default_font(), 12).render(
-                line, False, (255, 255, 255), (0, 0, 0))
+    def center_msg(self):
+        pass
 
-            msgim_center_x, msgim_center_y = msg_image.get_size()
-            msgim_center_x //= 2
-            msgim_center_y //= 2
-
-            self.screen.blit(msg_image, (
-                self.width // 2 - msgim_center_x,
-                self.height // 2 - msgim_center_y + i * 22))
-
-    def draw_matrix(self, matrix, offset):
-        off_x, off_y = offset
-        for y, row in enumerate(matrix):
-            for x, val in enumerate(row):
-                if val:
-                    pygame.draw.rect(
-                        self.screen,
-                        colors[val],
-                        pygame.Rect(
-                            (off_x + x) *
-                            config['cell_size'],
-                            (off_y + y) *
-                            config['cell_size'],
-                            config['cell_size'],
-                            config['cell_size']), 0)
 
     def move(self, delta_x):
         if not self.gameover and not self.paused:
@@ -76,8 +46,7 @@ class Tetris(object):
                 self.stone_x = new_x
 
     def quit(self):
-        self.center_msg("Exiting...")
-        pygame.display.update()
+        self.center_msg()
         sys.exit()
 
     def drop(self):
@@ -115,52 +84,48 @@ class Tetris(object):
         if self.gameover:
             self.init_game()
             self.gameover = False
+            
+    def press(self, event):
+        if event.name == 'left':
+            self.move(-1)
+        elif event.name == 'right':
+            self.move(+1)
+        elif event.name == 'down':
+            self.drop()
+        elif event.name == 'up':
+            self.rotate_stone()
+        elif event.name == 'p':
+            self.toggle_pause()
+        elif event.name == 'space':
+            self.start_game()
+        elif event.name == '\x1b':
+            self.quit()
+
+    def next_frame(self):
+        self.drop()
+        self.timeframe = Timer(0.75, self.next_frame)
+        self.timeframe.start()
 
     def run(self):
-        key_actions = {
-            'ESCAPE': self.quit,
-            'LEFT': lambda: self.move(-1),
-            'RIGHT': lambda: self.move(+1),
-            'DOWN': self.drop,
-            'UP': self.rotate_stone,
-            'p': self.toggle_pause,
-            'SPACE': self.start_game
-        }
 
         self.gameover = False
         self.paused = False
 
-        pygame.time.set_timer(pygame.USEREVENT + 1, config['delay'])
-        dont_burn_my_cpu = pygame.time.Clock()
+        self.timeframe.start()
         while 1:
-            self.screen.fill((0, 0, 0))
             if self.gameover:
-                self.center_msg("""Game Over!
-Press space to continue""")
+                self.center_msg()
             else:
                 if self.paused:
-                    self.center_msg("Paused")
-                else:
-                    self.draw_matrix(self.board, (0, 0))
-                    self.draw_matrix(self.stone,
-                                     (self.stone_x,
-                                      self.stone_y))
-            pygame.display.update()
-
-            for event in pygame.event.get():
-                if event.type == pygame.USEREVENT + 1:
-                    self.drop()
-                elif event.type == pygame.QUIT:
-                    self.quit()
-                elif event.type == pygame.KEYDOWN:
-                    for key in key_actions:
-                        if event.key == eval("pygame.K_"
-                                             + key):
-                            key_actions[key]()
-
-            dont_burn_my_cpu.tick(config['maxfps'])
+                    self.center_msg()
+            led_matrix = copy.deepcopy(self.board)
+            for i, row in enumerate(self.stone):
+                for j, pixel in enumerate(row):
+                    led_matrix[self.stone_y+i][self.stone_x+j] = led_matrix[self.stone_y+i][self.stone_x+j] or pixel
+            self.led.WriteMap(led_matrix)
 
 
 if __name__ == '__main__':
     App = Tetris()
+    keyboard.on_press(App.press)
     App.run()

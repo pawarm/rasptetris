@@ -45,9 +45,3 @@ class MAX7219:
         self.Write(0x0c,0x01,0x0c,0x01)
         self.Write(0x0f,0x00,0x0f,0x00)
 
-led = MAX7219()
-led.Init()
-
-while True:
-    led.WriteMap(bit_matrix)
-    time.sleep(1)
